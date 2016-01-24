@@ -4,12 +4,12 @@
 
 -- Variables
 local variable_mt = {
-	__tostring = function(v) return "_"..v.count end,
-	__eq = function(a, b) return a.count == b.count end
+	__tostring = function(v) return "_"..v.id end,
+	__eq = function(a, b) return a.id == b.id end
 }
 
-local function variable(count)
-	v = {count=count}
+local function variable(id)
+	v = {id=id}
 	setmetatable(v, variable_mt)
 	return v
 end
@@ -35,11 +35,17 @@ local function increment(state)
 	return new
 end
 
+
+-- This implementation of walk recurses over lists and tables;
 local function walk(u, state)
-	if state == nil then
-		print(debug.traceback())
-	end
 	if not isVar(u) then
+		if type(u) == 'table' then
+			local ret = {}
+			for k,v in pairs(u) do
+				ret[k] = walk(v, state)
+			end
+			return ret
+		end
 		return u
 	end
 	if state.substitutions[tostring(u)] ~= nil then
@@ -98,20 +104,16 @@ end
 
 -- goals are func -> state ->stream
 local function bind(stream1, goal)
-	print("BINDING", table_tostring(stream1), goal)
+	-- TODO(andrew): clean this up.
 	if stream1 == nil or (stream1.first == nil and stream1.rest == nil) then
-		print("nasty shit in bind")
 		return stream(nil, nil)
 	end
 	if stream1.first == nil and stream1.rest ~= nil  then
-		print("bind to rest of stream")
 		return bind(stream1.rest(), goal)
 	end
 	if stream1.rest == nil then
-		print("only one state, apply the goal and move on")
 		return goal(stream1.first)
 	end
-	print("returning the merge")
 	return merge( goal(stream1.first), bind( stream1.rest(), goal))
 end
 
@@ -119,15 +121,24 @@ end
 local function unify(u, v, state)
 	u = walk(u, state)
 	v = walk(v, state)
-	print("unifying",u,v)
 	if isVar(u) and isVar(v) and u == v then
 		return state
 	elseif isVar(u) then
 		return extend(u, v, state)
 	elseif isVar(v) then
 		return extend(v, u, state)
-	-- TODO(andrew): recurse over structured data.
-
+	elseif type(u) == 'table' and type(v) == 'table' then
+		-- if the keys in each table are different, then we can't unify.
+		if not check_keys(u, v) then
+			return nil
+		end
+		for k,u_value in pairs(u) do
+			state = unify(u_value, v[k], state)
+			if state == nil then
+				return nil
+			end
+		end
+		return state
 	elseif table_eq(u, v) then
 		return state
 	end
@@ -169,7 +180,7 @@ local function call_fresh(f)
 end
 
 local function reify1st(state)
-	return state.substitutions["_0"]
+	return walk(variable(0), state)
 end
 
 local function pull(stream, n, e)
@@ -178,7 +189,6 @@ local function pull(stream, n, e)
 	while #results < n and stream ~= nil do
 		if stream.first ~= nil then
 			results[#results + 1] = e(stream.first)
-			print("pulled", table_tostring(stream.first))
 		end
 		if stream.rest ~= nil then
 			stream = stream.rest()

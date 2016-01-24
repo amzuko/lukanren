@@ -74,7 +74,7 @@ function table_tostring(t1)
    end
    local s = "{"
    for k,v in pairs(t1) do
-      s = s .." "..tostring(k).."="..table_tostring(v)..","
+      s = s .." "..table_tostring(k).."="..table_tostring(v)..","
    end
    return s.."}"
 end

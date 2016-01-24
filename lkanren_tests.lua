@@ -118,15 +118,126 @@ TestLogic.testDisj = function()
 end
 
 
+TestLogic.testStructured = function()
+
+	assert_one_result(
+		cf(function(v1) return
+			eq({foo=v1}, {foo="bar"})
+			end),
+		"bar")
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3)
+				return conj(eq({foo=v2, bar=456},
+								{foo=123, bar=v3}),
+							eq(v1, {v2, v3}))
+			end) end) end),
+		{123, 456})
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3)
+				return conj(
+							eq(v1, {v2, v3}),
+							eq({foo=v2, bar=v3},
+								{foo=123, bar=456}))
+			end) end) end),
+		{123, 456})
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3) return
+			cf(function(v4)
+				return conj(conj(
+							eq(v2, {v3, 456}),
+							eq(v2, {123, v4})
+							),
+							eq(v1, {v2, v3, v4}))
+			end) end) end) end),
+		{{123, 456}, 123, 456})
+
+
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3) return
+			cf(function(v4)
+				return conj(conj(
+							-- single variables on the rhs of relation
+							eq({v3, 456}, v2),
+							eq({123, v4}, v2)
+							),
+							eq(v1, {v2, v3, v4}))
+			end) end) end) end),
+		{{123, 456}, 123, 456})
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3)
+				return conj(
+							eq({v2, v3}, {123, 456}),
+							eq(v1, {v2, v3})
+							)
+			end) end) end),
+		{123, 456})
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3)
+				return conj(
+							eq(v1, {v2, v3}),
+							eq(v1, {123, 456})
+							)
+			end) end) end),
+		{123, 456})
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3) return
+			cf(function(v4)
+				return conj(conj(
+							-- single variables on the rhs of relation
+							eq({v3, {456}}, v2),
+							eq({123, {v4}}, v2)
+							),
+							eq(v1, {v2, v3, v4}))
+			end) end) end) end),
+		{{123, {456}}, 123, 456})
+
+
+	assert_one_result(
+			cf(function(v1) return
+			cf(function(v2) return
+			cf(function(v3) return
+			cf(function(v4)
+				return conj(conj(
+							-- single variables on the rhs of relation
+							eq({k1= v2, k2= "second value"}, v3),
+							eq(v3, {k1= "first value", k2= v4})
+							),
+							eq(v1, {v2, v4}))
+			end) end) end) end),
+		{"first value", "second value"})
+end
+
+
 function main()
 	local failures = {}
 	for k,v in pairs(TestLogic) do
-		print("starting "..k)
+		print("starting "..k.."...")
 		local status, err = pcall(v)
 		if not status then
 			failures[k] = err
 		end
-		print("finished "..k)
+		print("      ...finished "..k..".")
 	end
 
 	local n_failures = table_length(failures)
