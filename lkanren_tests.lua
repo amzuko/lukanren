@@ -228,6 +228,50 @@ TestLogic.testStructured = function()
 		{"first value", "second value"})
 end
 
+TestLogic.testInfiniteStreams = function()
+	local fives
+	fives = function ( v1 )
+		return disj(
+			eq(v1, 5),
+			function(state)
+				return logic.stream(nil,
+					function()
+						return fives(v1)(state)
+					end
+					)
+			end
+		)
+	end
+
+	local sixes
+	sixes = function ( v1 )
+		return disj(
+			eq(v1, 6),
+			function(state)
+				return logic.stream(nil,
+					function()
+						return sixes(v1)(state)
+					end
+					)
+			end
+		)
+	end
+
+	local fives_and_sixes = function (v1)
+		return disj(fives(v1), sixes(v1))
+	end
+
+
+	local stream = cf(fives)(logic.empty())
+	assert_eq(logic.reifyN1st(stream, 3), {5,5,5})
+
+	stream = cf(sixes)(logic.empty())
+	assert_eq(logic.reifyN1st(stream, 3), {6,6,6})
+
+	stream = cf(fives_and_sixes)(logic.empty())
+	assert_eq(logic.reifyN1st(stream, 6), {5, 6, 5, 6, 5, 6})
+end
+
 
 function main()
 	local failures = {}
