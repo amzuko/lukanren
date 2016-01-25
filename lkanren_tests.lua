@@ -2,9 +2,14 @@ local logic = require("lkanren")
 require("util")
 
 local cf = logic.call_fresh
+local cfn = logic.call_fresh_n
 local eq = logic.equal
+local neq = logic.notequal
 local conj = logic.conj
 local disj = logic.disj
+local any = logic.any
+local all = logic.all
+
 
 local assert_count = 0
 function assert_eq(actual, expected, message)
@@ -77,13 +82,11 @@ TestLogic.testEquate = function()
 end
 
 TestLogic.testConj = function()
-	local s = cf(function(v1) return
-			cf(function(v2) return
-			conj(
+	local s = cfn(2, function(v1, v2)
+			return conj(
 				eq(v2, 123),
 				eq(v1, v2)
 			)
-		end)
 		end) (logic.empty())
 
 	assert_eq(logic.reifyN1st(s, 1), {123})
@@ -270,6 +273,58 @@ TestLogic.testInfiniteStreams = function()
 
 	stream = cf(fives_and_sixes)(logic.empty())
 	assert_eq(logic.reifyN1st(stream, 6), {5, 6, 5, 6, 5, 6})
+end
+
+TestLogic.testAllAny = function()
+
+	local stream = cf(function(v1)
+				return disj(
+					eq(v1, 3),
+					disj(eq(v1, 5),
+					eq(v1, 12))
+				)
+			end)(logic.empty())
+
+	assert_eq(logic.reifyN1st(stream, 9), {3,5,12})
+
+
+	local stream = cf(function(v1)
+				return any(
+					eq(v1, 3),
+					eq(v1, 5),
+					eq(v1, 12)
+				)
+			end)(logic.empty())
+
+	assert_eq(logic.reifyN1st(stream, 9), {3, 5, 12})
+
+	-- these should be integers
+	local rangeof = function(lower, upper)
+		return function(v)
+			local items = {}
+			for i = lower,upper do
+				items[#items + 1] = eq(i, v)
+			end
+			return function(state)
+				return any(unpack(items))(state)
+			end
+		end
+	end
+
+	local stream = cf(rangeof(1,9))(logic.empty())
+
+	-- ask for 10 to demonstrate that the stream terminates
+	assert_eq(logic.reifyN1st(stream, 10), {1,2,3,4,5,6,7,8,9})
+
+	stream = cfn(3, function(v1, v2, v3)
+			return all(
+				rangeof(1,3)(v2),
+				rangeof(1,3)(v3),
+				neq(v2, v3),
+				eq(v1, {v2, v3})
+			)
+		end)(logic.empty())
+	assert_eq(logic.reifyN1st(stream, 6), {{1,2}, {1,3}, {2,1}, {2,3}, {3,1}, {3,2}})
 end
 
 

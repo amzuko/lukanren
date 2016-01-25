@@ -157,6 +157,18 @@ local function equal(u, v)
 	end
 end
 
+local function notequal(u, v)
+	return function(state)
+		local u = walk(u, state)
+		local v = walk(v, state)
+		if u ~= v then
+			return unit(state)
+		else
+			return nil
+		end
+	end
+end
+
 local function disj(goal1, goal2)
 	return function(state)
 		return merge(goal1(state), goal2(state))
@@ -169,15 +181,69 @@ local function conj(goal1, goal2)
 	end
 end
 
-
--- main entry point
--- f: variable -> state -> stream
-local function call_fresh(f)
+local function fail()
 	return function(state)
-		local v = variable(state.count)
-		return f(v)(increment(state))
+		return nil
 	end
 end
+
+local function succeed()
+	return function(state)
+		return unit(state)
+	end
+end
+
+local function all(...)
+	local res = fail()
+	for i, g in ipairs({...}) do
+		if i == 1 then
+			res = g
+		else
+			-- This argument ordering is unfortunate, as it means that we will
+			-- traverse all the way down.
+			res = conj(res, g)
+		end
+	end
+	return res
+end
+
+local function any(...)
+	local res = succeed()
+	for i, g in ipairs({...}) do
+		if i == 1 then
+			res = g
+		else
+			-- This argument ordering is unfortunate, as it means that we will
+			-- traverse all the way down.
+			res = disj(res, g)
+		end
+	end
+	return res
+end
+
+-- main entry point
+
+local function call_fresh_n(n, f)
+	return function(state)
+		local vars = {}
+		for i = 1,n do
+			vars[i] = variable(state.count)
+			state = increment(state)
+		end
+		return f(unpack(vars))(state)
+	end
+end
+
+
+
+-- f: variable -> state -> stream
+local function call_fresh(f)
+	return call_fresh_n(1, f)
+end
+
+
+
+-- helpers
 
 local function reify1st(state)
 	return walk(variable(0), state)
@@ -212,15 +278,25 @@ return {
 	extend = extend,
 	empty = empty,
 
+	-- TODO(andrew): reconsider exporting this.
+	unify = unify,
+
 	-- streams
 	stream = stream,
 	unit = unit,
 
 	equal = equal,
+	notequal = notequal,
 	conj = conj,
 	disj = disj,
 
+	succeed = succeed,
+	fail = fail,
+	all = all,
+	any = any,
+
 	call_fresh = call_fresh,
+	call_fresh_n = call_fresh_n,
 
 	-- helpers
 	reifyN1st = reifyN1st
